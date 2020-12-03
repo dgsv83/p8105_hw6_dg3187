@@ -96,5 +96,65 @@ models_results_df %>%
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
+
+### Problem 2
+
+
+```{r}
+bwt_df =
+  read_csv("./data/birthweight.csv") %>%
+  janitor::clean_names() %>% 
+  mutate(
+    babysex = as.factor(babysex),
+    frace = as.factor(frace),
+    mrace = as.factor(mrace)
+  ) %>% 
+  mutate(
+    babysex = case_when(babysex == 1 ~ "male",
+                        babysex == 2 ~ "female"),
+    frace = case_when(frace == 1 ~ "White", 
+                      frace == 2 ~ "Black", 
+                      frace == 3 ~ "Asian", 
+                      frace == 4 ~ "Puerto_Rican", 
+                      frace == 8 ~ "Other"),
+    mrace = case_when(mrace == 1 ~ "White", 
+                      mrace == 2 ~ "Black", 
+                      mrace == 3 ~ "Asian", 
+                      mrace == 4 ~ "Puerto_Rican"))
 ```
+
+
+# Model 1: length at birth and gestational age as predictors
+
+```{r}
+main_only_mod = lm(bwt ~ blength + gaweeks, data = bwt_df)
+```
+
+# Model 2: head circumference, length, sex, and all interactions (including the three-way interaction) 
+```{r}
+three_inter_mod = lm(bwt ~ bhead + blength + babysex +  bhead*blength*babysex, data = bwt_df)
+summary(three_inter_mod)
+```
+
+# Model 3:stepwise regression, and choose the best model by AIC
+```{r}
+library(MASS)
+library(leaps)
+full_model = lm(bwt ~., data = bwt_df)
+stepwise_mod = stepAIC(full_model, direction = "both", trace = FALSE)
+summary(stepwise_mod)
+```
+
+
+# Visually see how these three models work:
+```{r}
+bwt_df %>% 
+  gather_predictions(main_only_mod, three_inter_mod, stepwise_mod) %>% 
+  mutate(model = fct_inorder(model)) %>% 
+  ggplot(aes(x = blength, y = bwt)) + 
+  geom_point(alpha = .5) +
+  geom_line(aes(y = pred), color = "red") + 
+  facet_grid(~model)
+```
+
 
