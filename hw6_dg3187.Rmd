@@ -107,11 +107,14 @@ bwt_df =
   mutate(
     babysex = as.factor(babysex),
     frace = as.factor(frace),
-    mrace = as.factor(mrace)
+    mrace = as.factor(mrace),
+    malform = as.factor(malform)
   ) %>% 
   mutate(
     babysex = case_when(babysex == 1 ~ "male",
                         babysex == 2 ~ "female"),
+    malform = case_when(malform == 0 ~ "absent",
+                        malform == 1 ~ "present"),
     frace = case_when(frace == 1 ~ "White", 
                       frace == 2 ~ "Black", 
                       frace == 3 ~ "Asian", 
@@ -124,37 +127,71 @@ bwt_df =
 ```
 
 
-# Model 1: length at birth and gestational age as predictors
-
-```{r}
-main_only_mod = lm(bwt ~ blength + gaweeks, data = bwt_df)
-```
-
-# Model 2: head circumference, length, sex, and all interactions (including the three-way interaction) 
-```{r}
-three_inter_mod = lm(bwt ~ bhead + blength + babysex +  bhead*blength*babysex, data = bwt_df)
-summary(three_inter_mod)
-```
-
-# Model 3:stepwise regression, and choose the best model by AIC
+### Model 1: 
+I used stepwise regression. The 'stepAIC' function also helps to choose the best model.'stepAIC' uses AIC criterion and tries to find the model with the lowest AIC value. We ended up with a model predicted by 11 covariates including babysex, bhead, blength, delwt, fincome, gaweeks, mheight,  mrace, parity, ppwt, and smoken
 ```{r}
 library(MASS)
 library(leaps)
 full_model = lm(bwt ~., data = bwt_df)
-stepwise_mod = stepAIC(full_model, direction = "both", trace = FALSE)
+stepwise_mod = stepAIC(full_model, direction = "backward", trace = FALSE)
 summary(stepwise_mod)
 ```
 
 
-# Visually see how these three models work:
 ```{r}
-bwt_df %>% 
-  gather_predictions(main_only_mod, three_inter_mod, stepwise_mod) %>% 
-  mutate(model = fct_inorder(model)) %>% 
-  ggplot(aes(x = blength, y = bwt)) + 
-  geom_point(alpha = .5) +
-  geom_line(aes(y = pred), color = "red") + 
-  facet_grid(~model)
+broom::tidy(stepwise_mod)
+
+plot_model_1 = 
+  bwt_df %>% 
+  modelr::add_residuals(stepwise_mod) %>% 
+  modelr::add_predictions(stepwise_mod) %>% 
+  ggplot(aes(x = pred, y = resid)) +
+  geom_point(alpha = 0.3) +
+  labs(
+    title = "Residuals versus Fitted value plot for Model 1",
+    x = "Predictor",
+    y = "Residual"
+  )
+  
+plot_model_1 
 ```
 
+
+
+### Model 2: length at birth and gestational age as predictors
+
+```{r}
+main_only_mod = lm(bwt ~ blength + gaweeks, data = bwt_df)
+summary(main_only_mod)
+```
+
+### Model 3: head circumference, length, sex, and all interactions (including the three-way interaction) 
+```{r}
+three_inter_mod = lm(bwt ~ bhead * blength * babysex, data = bwt_df)
+summary(three_inter_mod)
+```
+
+# Cross-validation
+
+```{r}
+cv_df =
+  crossv_mc(bwt_df, 300) %>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble))
+```
+
+```{r}
+cv_df = 
+  cv_df %>% 
+  mutate(
+    main_mod  = map(train, ~lm(bwt ~ blength + gaweeks, data = .x)),
+    three_mod = map(train, ~lm(bwt ~ bhead * blength * babysex, data = .x)),
+    step_mod  = map(train, ~lm(bwt ~ babysex + bhead + blength + delwt + fincome + 
+                      gaweeks + mheight + mrace + parity + ppwt + smoken, data = .x))) %>% 
+  mutate(
+    rmse_main = map2_dbl(main_mod, test, ~rmse(model = .x, data = .y)),
+    rmse_three = map2_dbl(three_mod, test, ~rmse(model = .x, data = .y)),
+    rmse_step = map2_dbl(step_mod, test, ~rmse(model = .x, data = .y)))
+```
 
