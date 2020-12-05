@@ -237,7 +237,7 @@ weather_df =
 set.seed(1)
 boot_results =
   weather_df %>% 
-  bootstrap(n = 50, id = "strap_id") %>% 
+  bootstrap(n = 5000, id = "strap_id") %>% 
   mutate(
     models = map(strap, ~lm(tmax ~ tmin, data = .x)),
     results_tidy = map(models, broom::tidy),
@@ -260,13 +260,13 @@ estimate_rsquared =
 estimate_rsquared
 ```
 
-The distribution of r squared is relatively a normal distribution which is a little bit right-skewed. It is centered around 0.91 which suggests a high goodness-of-fit.
+The distribution of r squared is relatively a normal distribution which is a little heavier left-tail. It is centered around 0.91 which suggests a high goodness-of-fit.
 
 
 ### Distribution of log(b0*b1)
 
 ```{r}
-estimate_log = 
+log_df = 
   boot_results %>% 
   pivot_wider(
     names_from = term, 
@@ -274,7 +274,10 @@ estimate_log =
   rename(intercept = `(Intercept)`) %>% 
   mutate(
     log_b0_times_b1 = log(tmin * intercept)
-  ) %>% 
+  )
+  
+estimate_log = 
+  log_df %>% 
   ggplot(aes(x = log_b0_times_b1)) +
   geom_density() +
   labs(
@@ -285,16 +288,27 @@ estimate_log
 
 The distribution of log(b0*b1) is relatively a normal distribution which is centered around 2.01.
 
-### 95% Confidence interval for r squared
+### 95% Confidence Interval for r squared
 
 ```{r}
-
+boot_results %>% 
+  distinct(strap_id, r.squared) %>%
+  summarise(lower = quantile(r.squared, 0.025),
+            upper = quantile(r.squared, 0.975)) %>%
+  knitr::kable(caption = "95% Confidence Interval for R squared")
 ```
 
+The 95% Confidence Interval for R squared is (0.894, 0.927)
 
 ### 95% Confidence interval for log(b0*b1)
 
 ```{r}
+log_df %>% 
+  distinct(strap_id, log_b0_times_b1) %>%
+  summarise(lower = quantile(log_b0_times_b1, 0.025),
+            upper = quantile(log_b0_times_b1, 0.975)) %>%
+  knitr::kable(caption = "95% Confidence Interval for log(b0*b1)")
 
 ```
 
+The 95% Confidence Interval for log(b0*b1) is (1.965, 2.059)
