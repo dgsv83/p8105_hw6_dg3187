@@ -103,8 +103,9 @@ models_results_df %>%
 
 ```{r}
 bwt_df =
-  read_csv("./data/birthweight.csv") %>%
+  read_csv("./data/birthweight.csv") %>% 
   janitor::clean_names() %>% 
+  drop_na() %>% 
   mutate(
     babysex = as.factor(babysex),
     frace = as.factor(frace),
@@ -125,7 +126,10 @@ bwt_df =
                       mrace == 2 ~ "Black", 
                       mrace == 3 ~ "Asian", 
                       mrace == 4 ~ "Puerto_Rican"))
+
 ```
+
+
 
 
 ### Model 1: 
